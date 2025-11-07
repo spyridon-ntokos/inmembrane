@@ -1,0 +1,9 @@
+beautifulsoup4>=4.11.1
+bs4
+cssselect
+lxml
+requests>=2.0.0
+semantic_version
+suds>=0.4
+twill>=3.1.0
+pyyaml

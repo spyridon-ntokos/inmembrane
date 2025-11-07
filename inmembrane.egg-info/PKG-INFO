@@ -1,0 +1,35 @@
+Metadata-Version: 2.4
+Name: inmembrane
+Version: 0.96.0
+Summary: A modular bioinformatics pipeline for proteome annotation and prediction of bacterial surface-exposed proteins.
+Home-page: https://github.com/spyridon-ntokos/inmembrane-modern
+Author: Andrew Perry, Bosco Ho, and contributors
+Author-email: ajperry@pansapiens.com
+License: BSD-3-Clause
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Scientific/Engineering :: Bio-Informatics
+Requires-Python: >=3.8
+License-File: LICENSE
+Requires-Dist: beautifulsoup4>=4.11.1
+Requires-Dist: bs4
+Requires-Dist: cssselect
+Requires-Dist: lxml
+Requires-Dist: requests>=2.0.0
+Requires-Dist: semantic_version
+Requires-Dist: suds>=0.4
+Requires-Dist: twill>=3.1.0
+Requires-Dist: pyyaml
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

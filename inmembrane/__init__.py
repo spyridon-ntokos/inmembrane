@@ -1,186 +1,163 @@
-__version__ = "0.95.0"  # Must be a semantic version number
-import helpers
+"""
+Modernized inmembrane core — plugin-free, Python 3+
+"""
+__version__ = "0.96.0-dev"
 
-import os, shutil
+import os, sys, shutil, importlib, codecs, textwrap, json
+from collections import OrderedDict
+from .helpers import dict_get, create_proteins_dict, log_stdout, log_stderr
+
+# Optional YAML config support
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 module_dir = os.path.abspath(os.path.dirname(__file__))
 
-default_params_str = """{
-  'fasta': '',
-  'csv': '',
-  'out_dir': '',
-  'protocol': 'gram_pos', # 'gram_neg'
-  
-#### Signal peptide and transmembrane helix prediction
-#   'signalp4_bin': 'signalp',
-  'signalp4_bin': 'signalp_scrape_web',
-#   'lipop1_bin': 'LipoP',
-  'lipop1_bin': 'lipop_scrape_web',
-#   'tmhmm_bin': 'tmhmm',
-  'tmhmm_bin': 'tmhmm_scrape_web',
-   'memsat3_bin': 'runmemsat',
-  'helix_programs': ['tmhmm'],
-# 'helix_programs': ['tmhmm', 'memsat3'],
-  'terminal_exposed_loop_min': 50, # unused in gram_neg protocol
-  'internal_exposed_loop_min': 100, # try 30 for gram_neg
-  
-#### Sequence similarity and motif prediction
-  'hmmsearch3_bin': 'hmmsearch',
-  'hmm_evalue_max': 0.1,
-  'hmm_score_min': 10,
-  
-#### Outer membrane beta-barrel predictors
-  'barrel_programs': ['tmbetadisc-rbf'],
-# 'barrel_programs': ['bomp', 'tmbetadisc-rbf'],
-  'bomp_clearly_cutoff': 3, # if >= than this, always classify as an OM(barrel)
-  'bomp_maybe_cutoff': 1, # must also have a signal peptide to be OM(barrel)
-  'tmbetadisc_rbf_method': 'aadp', # aa, dp, aadp or pssm
-}
-"""
+# Default config path
+DEFAULT_CONFIG_PATH = os.path.expanduser(
+    "~/SerraPHIM_v2/tools/inmembrane/inmembrane.config"
+)
 
+def get_params(config_path=None):
+    """
+    Loads configuration parameters from an existing config file.
+    If no config is found, creates a new default one at the default path.
+    """
 
-def get_params():
-    from helpers import log_stderr
-    """
-    Gets the params dictionary that hold all the configuration
-    information of the program. This is loaded from 'inmembrane.config'
-    which should be found in the same place as the main binary.
-  
-    If 'inmembrane.config' is not a found, a default 'inmembrane.config'
-    is generated from 'default_params_str'. The config file should
-    be edited if the binaries are not available on the path, or have
-    different names.
-    """
-    config = os.path.join(os.getcwd(), 'inmembrane.config')
-    if not os.path.isfile(config):
-        log_stderr("# Couldn't find inmembrane.config file")
-        log_stderr("# So, will generate a default config " + config)
-        abs_hmm_profiles = os.path.join(module_dir, 'hmm_profiles')
-        fh = open(config, 'w')
-        fh.write(default_params_str)
-        fh.close()
+    # Determine config path
+    config = config_path or DEFAULT_CONFIG_PATH
+
+    if os.path.isfile(config):
+        log_stderr(f"# Loading configuration from {config}")
     else:
-        log_stderr("# Loading existing inmembrane.config")
+        log_stderr(f"# No inmembrane.config found, generating a default one at {config}")
+        os.makedirs(os.path.dirname(config), exist_ok=True)
+        fh = open(config, 'w')
+        fh.write("""{
+'fasta': '',
+'csv': 'out_default.csv',
+'json': 'out_default.json',
+'out_dir': 'out_default',
+'protocol': 'gram_neg_modern',
+
+'signalp_bin': 'signalp6',
+'deeptmhmm_bin': 'deeptmhmm',
+'deeplocpro_bin': 'deeplocpro',
+'massp_bin': 'massp',
+'hmmer_bin': 'hmmer',
+
+'predictors': ['signalp', 'deeptmhmm', 'deeplocpro', 'massp', 'hmmer'],
+
+'signalp_organism': 'gram-',
+'massp_threshold_exposed': 0.30,
+'internal_exposed_loop_min': 30,
+'bomp_clearly_cutoff': 3.0,
+'bomp_maybe_cutoff': 1.0,
+'tmbetadisc_positive_required_signal': True,
+
+'citations': 'citations.txt'
+}""")
+        fh.close()
+
     params = eval(open(config).read())
+    params["_config_path"] = config  # store for reference
     return params
 
 
 def init_output_dir(params):
     """
-    Creates a directory for all output files and makes it the current
-    working directory. copies the input sequences into it as 'input.fasta'.
+    Modernized output directory initialization.
+
+    - Ensures 'out_dir' exists.
+    - Does NOT copy input FASTA or config.
+    - Does NOT change the working directory.
+    - Normalizes CSV/JSON paths inside 'out_dir'.
     """
-    from helpers import dict_get
+    out_dir = os.path.abspath(params.get("out_dir", "inmembrane_out"))
+    os.makedirs(out_dir, exist_ok=True)
 
-    if dict_get(params, 'out_dir'):
-        base_dir = params['out_dir']
-    else:
-        base_dir = '.'.join(os.path.splitext(params['fasta'])[:-1])
-        params['out_dir'] = base_dir
-    if not os.path.isdir(base_dir):
-        os.makedirs(base_dir)
+    base_name = os.path.splitext(os.path.basename(params["fasta"]))[0]
+    params["csv"] = os.path.join(out_dir, f"{base_name}_out.csv")
+    params["json"] = os.path.join(out_dir, f"{base_name}_out.json")
+    params["citations"] = os.path.join(out_dir, "citations.txt")
 
-    if not dict_get(params, 'csv'):
-        basename = '.'.join(os.path.splitext(params['fasta'])[:-1])
-        params['csv'] = basename + '.csv'
-    params['csv'] = os.path.abspath(params['csv'])
+    log_stderr(f"# Output directory: {out_dir}")
+    log_stderr(f"# CSV will be saved to: {params['csv']}")
+    log_stderr(f"# JSON will be saved to: {params['json']}")
+    log_stderr(f"# Citations will be saved to: {params['citations']}")
 
-    params['citations'] = os.path.join(params['out_dir'], 'citations.txt')
-    params['citations'] = os.path.abspath(params['citations'])
-
-    fasta = "input.fasta"
-    shutil.copy(params['fasta'], os.path.join(base_dir, fasta))
-    params['fasta'] = fasta
-
-    shutil.copy(os.path.join(os.getcwd(), 'inmembrane.config'), base_dir)
-
-    os.chdir(base_dir)
+    return out_dir
 
 
-def import_protocol_python(params):
+def import_protocol(params):
     """
-    Some python magic that loads the desired protocol file
-    encoded in the string 'params['protocol'] as a python file
-    with the internal variable name 'protocol'. An appropriate
-    python command is generated that is to be processed by
-    the 'exec' function.
+    Import the selected Gram+ or Gram– protocol module.
     """
-    protocol_py = os.path.join(module_dir, 'protocols',
-                               params['protocol'] + '.py')
-    if not os.path.isfile(protocol_py):
-        raise IOError("Couldn't find protcols/" + protocol_py)
-    return 'import inmembrane.protocols.%s as protocol' % (params['protocol'])
+    name = params.get("protocol", "gram_pos")
+    module_name = f"inmembrane.protocols.{name}"
+    try:
+        return importlib.import_module(module_name)
+    except Exception as e:
+        raise ImportError(f"Cannot import protocol {module_name}: {e}")
+
+
+def write_json(proteins, out_path):
+    with open(out_path, "w") as fh:
+        json.dump(proteins, fh, indent=2)
 
 
 def process(params):
     """
-    Main program loop. Triggers the 'protocol' found in the params
-    to annotate all proteins give the list of annotations needed by
-    'protocol'. Then outputs to screen and a .csv file.
+    Core execution loop. Loads protocol, runs each predictor in the registry.
     """
-    from helpers import dict_get, create_proteins_dict, log_stdout, log_stderr
-    # will load all plugins in the plugins/ directory
-    from inmembrane.plugins import *
+    from .predictors import get_predictor
 
-    # initializations
-    exec (import_protocol_python(params))
+    protocol = import_protocol(params)
     init_output_dir(params)
-    seqids, proteins = create_proteins_dict(params['fasta'])
+    seqids, proteins = create_proteins_dict(params["fasta"])
 
-    # TODO: ideally this loop needs to be run within the protocol,
-    #       since for some protocols not all plugins
-    #       will be run for every sequence, conditional
-    #       on the outcome of a previous analysis
-    #       eg. protocol.run(params, proteins)
+    predictor_ids = protocol.get_annotations(params)
+    log_stderr(f"# Predictors to run: {', '.join(predictor_ids)}")
 
-    # annotates with external binaries as found in plugins
-    for plugin_str in protocol.get_annotations(params):
-        plugin = eval(plugin_str)
-        plugin.annotate(params, proteins)
+    for pid in predictor_ids:
+        try:
+            predictor = get_predictor(pid)
+        except Exception as e:
+            log_stderr(f"# WARNING: predictor '{pid}' not found or failed to import ({e}) — skipping.")
+            continue
 
-    # do protocol analysis on the results of the annotations
+        log_stderr(f"# Running {pid} ...")
+        try:
+            predictor.annotate(params, proteins)
+        except Exception as e:
+            log_stderr(f"# ERROR running predictor '{pid}': {e}")
+
+    # Protocol post-processing
     for seqid in seqids:
-        protein = proteins[seqid]
-        protocol.post_process_protein(params, protein)
+        protocol.post_process_protein(params, proteins[seqid])
         log_stdout(protocol.protein_output_line(seqid, proteins))
 
-    # print a summary table of classifications to stderr
     log_stderr(protocol.summary_table(params, proteins))
 
-    # always write to biologist-friendly csv file
-    f = open(params['csv'], 'w')
-    for seqid in seqids:
-        f.write(protocol.protein_csv_line(seqid, proteins))
-    f.close()
-    log_stderr("\n")
-    log_stderr("Output written to %s" % (params['csv']))
+    # Write CSV
+    with open(params["csv"], "w") as f:
+        for sid in seqids:
+            f.write(protocol.protein_csv_line(sid, proteins))
+    log_stderr(f"# CSV written to {params['csv']}")
 
-    # TODO: citations for specific HMMs (PFAM etc ?)
+    # Write JSON
+    write_json(proteins, params["json"])
+    log_stderr(f"# JSON written to {params['json']}")
 
-    # write citations to a file and gracefully deal with plugins
-    # without a citation defined
-    import codecs
-    import textwrap
-    f = codecs.open(params['citations'], mode='w', encoding='utf-8')
-    programs_used = []
-    for program in protocol.get_annotations(params):
-        plugin = eval(program)
-        try:
-            f.write(plugin.citation['name'] + ":\n")
-            f.write(textwrap.fill(plugin.citation['ref']))
-        except AttributeError:
-            f.write("%s - no citation provided." % program)
-        f.write("\n\n")
-        try:
-            programs_used.append(plugin.citation['name'])
-        except (AttributeError, KeyError):
-            programs_used.append(program)
-
-    f.close()
-    log_stderr("\n")
-    log_stderr("This run used %s." % (", ".join(programs_used)))
-    log_stderr("References have been written to %s \n"
-               "# - please cite as appropriate." %
-               (params['citations']))
+    # Write simple citations / run summary
+    with open(params['citations'], 'w', encoding='utf-8') as f:
+        f.write("# SerraPHIM-inmembrane modern run\n")
+        f.write("# Predictors used:\n")
+        for pred in params.get("predictors", []):
+            f.write(f"- {pred}\n")
+        f.write("# (References available in SerraPHIM documentation.)\n")
+    log_stderr(f"Citations summary written to {params['citations']}")
 
     return proteins

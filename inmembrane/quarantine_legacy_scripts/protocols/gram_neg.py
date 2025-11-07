@@ -6,8 +6,7 @@ def get_annotations(params):
     annotations = []
     params['signalp4_organism'] = 'gram-'
 
-    if not params['signalp4_bin'] or params[
-        'signalp4_bin'] == 'signalp_scrape_web':
+    if not params['signalp4_bin'] or params['signalp4_bin'] == 'signalp_scrape_web':
         annotations += ['signalp_scrape_web']
     else:
         annotations += ['signalp4']
