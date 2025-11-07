@@ -8,11 +8,11 @@ Sets per-protein fields:
     - hmmer_hits (list of str)
 """
 
-from inmembrane.helpers import log_stderr
+from inmembrane.helpers import log_stderr, log_stdout
 
 
 def annotate(params, proteins):
-    log_stderr("# Running HMMER (mock mode) ...")
+    log_stdout("## Running HMMER (mock mode) ...")
 
     # --- Placeholder for pyHMMER integration ---
     # import pyhmmer
@@ -25,5 +25,5 @@ def annotate(params, proteins):
         # Randomly assign one hit for demonstration
         pdata["hmmer_hits"] = [mock_hits[hash(seqid) % len(mock_hits)]]
 
-    log_stderr("# HMMER annotations complete.\n")
+    log_stdout("## HMMER annotations complete.\n")
     return proteins

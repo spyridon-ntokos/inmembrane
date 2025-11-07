@@ -11,14 +11,14 @@ Sets per-protein fields:
 
 import os
 import subprocess
-from inmembrane.helpers import log_stderr
+from inmembrane.helpers import log_stderr, log_stdout
 
 
 def annotate(params, proteins):
     signalp_bin = params.get("signalp_bin", "signalp6")
     fasta = "input.fasta"
 
-    log_stderr("# Running SignalP 6.0 ...")
+    log_stdout("## Running SignalP 6.0 ...")
 
     # --- Placeholder: local CLI execution example ---
     # cmd = f"{signalp_bin} --fastafile {fasta} --organism {params['signalp_organism']} --format txt > signalp.out"
@@ -32,5 +32,5 @@ def annotate(params, proteins):
         pdata["signalp_type"] = "Sec/SPI" if pdata["signalp_is_sp"] else None
         pdata["signalp_cleave_position"] = 25 if pdata["signalp_is_sp"] else 0
 
-    log_stderr("# SignalP 6.0 annotations complete.\n")
+    log_stdout("## SignalP 6.0 annotations complete.\n")
     return proteins

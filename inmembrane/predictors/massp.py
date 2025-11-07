@@ -8,11 +8,11 @@ Sets per-protein fields:
     - massp_exposed_prob (float)
 """
 
-from inmembrane.helpers import log_stderr
+from inmembrane.helpers import log_stderr, log_stdout
 
 
 def annotate(params, proteins):
-    log_stderr("# Running MASSP ...")
+    log_stdout("## Running MASSP ...")
 
     # --- Placeholder: local model call ---
     # e.g., massp.predict(fasta="input.fasta", output="massp.json")
@@ -24,5 +24,5 @@ def annotate(params, proteins):
         pdata["massp_exposed_fraction"] = exposed_fraction
         pdata["massp_exposed_prob"] = exposed_fraction
 
-    log_stderr("# MASSP annotations complete.\n")
+    log_stdout("## MASSP annotations complete.\n")
     return proteins

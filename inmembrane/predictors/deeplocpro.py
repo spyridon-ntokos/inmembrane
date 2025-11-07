@@ -7,11 +7,11 @@ Sets per-protein fields:
     - deeplocpro_label (str)
 """
 
-from inmembrane.helpers import log_stderr
+from inmembrane.helpers import log_stderr, log_stdout
 
 
 def annotate(params, proteins):
-    log_stderr("# Running DeepLocPro ...")
+    log_stdout("## Running DeepLocPro ...")
 
     # --- Placeholder: model invocation ---
     # e.g., deep_loc_pro.predict(fasta="input.fasta", output="deeplocpro.json")
@@ -22,5 +22,5 @@ def annotate(params, proteins):
     for i, (seqid, pdata) in enumerate(proteins.items()):
         pdata["deeplocpro_label"] = locs[i % len(locs)]
 
-    log_stderr("# DeepLocPro annotations complete.\n")
+    log_stdout("## DeepLocPro annotations complete.\n")
     return proteins

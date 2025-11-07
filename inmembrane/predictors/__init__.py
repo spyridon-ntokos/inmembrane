@@ -5,7 +5,7 @@ Unified predictor entrypoint — lazy importer (safe for circular imports)
 import importlib
 import sys
 
-PREDICTOR_NAMES = ["signalp", "deeptmhmm", "deeplocpro", "massp", "hmmer"]
+PREDICTOR_NAMES = ["signalp6", "deeptmhmm", "deeplocpro", "massp", "hmmer"]
 
 def get_predictor(name):
     """

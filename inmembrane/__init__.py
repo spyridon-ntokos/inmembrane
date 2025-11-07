@@ -30,6 +30,7 @@ def get_params(config_path=None):
     config = config_path or DEFAULT_CONFIG_PATH
 
     if os.path.isfile(config):
+        print()
         log_stderr(f"# Loading configuration from {config}")
     else:
         log_stderr(f"# No inmembrane.config found, generating a default one at {config}")
@@ -83,10 +84,11 @@ def init_output_dir(params):
     params["json"] = os.path.join(out_dir, f"{base_name}_out.json")
     params["citations"] = os.path.join(out_dir, "citations.txt")
 
+    print()
     log_stderr(f"# Output directory: {out_dir}")
     log_stderr(f"# CSV will be saved to: {params['csv']}")
     log_stderr(f"# JSON will be saved to: {params['json']}")
-    log_stderr(f"# Citations will be saved to: {params['citations']}")
+    log_stderr(f"# Citations will be saved to: {params['citations']}\n")
 
     return out_dir
 
@@ -119,7 +121,8 @@ def process(params):
     seqids, proteins = create_proteins_dict(params["fasta"])
 
     predictor_ids = protocol.get_annotations(params)
-    log_stderr(f"# Predictors to run: {', '.join(predictor_ids)}")
+    print()
+    log_stdout(f"# Predictors to run: {', '.join(predictor_ids)}\n")
 
     for pid in predictor_ids:
         try:
@@ -127,8 +130,7 @@ def process(params):
         except Exception as e:
             log_stderr(f"# WARNING: predictor '{pid}' not found or failed to import ({e}) — skipping.")
             continue
-
-        log_stderr(f"# Running {pid} ...")
+        
         try:
             predictor.annotate(params, proteins)
         except Exception as e:
@@ -137,14 +139,18 @@ def process(params):
     # Protocol post-processing
     for seqid in seqids:
         protocol.post_process_protein(params, proteins[seqid])
-        log_stdout(protocol.protein_output_line(seqid, proteins))
+        #log_stdout(protocol.protein_output_line(seqid, proteins))
 
-    log_stderr(protocol.summary_table(params, proteins))
+    log_stdout(protocol.summary_table(params, proteins))
 
-    # Write CSV
+    # Write CSV (with header)
     with open(params["csv"], "w") as f:
+        # Write header line
+        f.write("SeqID,Category,LoopExtent,Details,Name\n")
+        # Write each protein line
         for sid in seqids:
             f.write(protocol.protein_csv_line(sid, proteins))
+    print()
     log_stderr(f"# CSV written to {params['csv']}")
 
     # Write JSON

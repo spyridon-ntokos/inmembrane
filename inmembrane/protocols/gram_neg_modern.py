@@ -42,13 +42,13 @@ def get_annotations(params):
     Returns the list of predictors required for the Gram-negative workflow
     and injects default tunable parameters if missing.
     """
-    predictors = ["signalp", "deeptmhmm", "deeplocpro", "massp", "hmmer"]
+    predictors = ["signalp6", "deeptmhmm", "deeplocpro", "massp", "hmmer"]
     params.setdefault("predictors", predictors)
 
     for k, v in DEFAULT_PARAMS.items():
         params.setdefault(k, v)
 
-    log_stderr(f"# Predictors to run: {', '.join(predictors)}")
+    #log_stderr(f"# Predictors to run: {', '.join(predictors)}")
     return predictors
 
 
@@ -187,7 +187,7 @@ def summary_table(params, proteins):
         cat = p["category"]
         counts[cat] = counts.get(cat, 0) + 1
 
-    out = "\n\n# Number of proteins in each class:\n"
+    out = "\n\n## Number of proteins in each class:\n"
     for c, n in sorted(counts.items()):
-        out += f"# {c:<25}\t{n}\n"
+        out += f"~ {c:<25}\t{n}\n"
     return out

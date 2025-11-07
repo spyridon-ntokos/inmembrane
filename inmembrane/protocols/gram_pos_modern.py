@@ -62,14 +62,14 @@ def get_annotations(params):
     Returns the list of predictors required for the Gram-positive workflow
     and injects default tunable parameters if missing.
     """
-    predictors = ["signalp", "deeptmhmm", "deeplocpro", "massp", "hmmer"]
+    predictors = ["signalp6", "deeptmhmm", "deeplocpro", "massp", "hmmer"]
     params.setdefault("predictors", predictors)
 
     # Merge defaults
     for k, v in DEFAULT_PARAMS.items():
         params.setdefault(k, v)
 
-    log_stderr(f"# Predictors to run: {', '.join(predictors)}")
+    #log_stderr(f"# Predictors to run: {', '.join(predictors)}")
     return predictors
 
 

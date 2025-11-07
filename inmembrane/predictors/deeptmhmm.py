@@ -7,11 +7,11 @@ Sets per-protein fields:
     - deeptmhmm_helices (list of tuples)
 """
 
-from inmembrane.helpers import log_stderr
+from inmembrane.helpers import log_stderr, log_stdout
 
 
 def annotate(params, proteins):
-    log_stderr("# Running DeepTMHMM ...")
+    log_stdout("## Running DeepTMHMM ...")
 
     # --- Placeholder: local or API call goes here ---
     # e.g., cmd = f"deeptmhmm --fasta input.fasta --format json > deeptmhmm.json"
@@ -23,5 +23,5 @@ def annotate(params, proteins):
         tmhmm = [(i, i + 20) for i in range(1, len(seq), 100) if i + 20 < len(seq)]
         pdata["deeptmhmm_helices"] = tmhmm
 
-    log_stderr("# DeepTMHMM annotations complete.\n")
+    log_stdout("## DeepTMHMM annotations complete.\n")
     return proteins
