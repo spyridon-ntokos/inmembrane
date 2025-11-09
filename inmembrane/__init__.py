@@ -121,8 +121,7 @@ def process(params):
     seqids, proteins = create_proteins_dict(params["fasta"])
 
     predictor_ids = protocol.get_annotations(params)
-    print()
-    log_stdout(f"# Predictors to run: {', '.join(predictor_ids)}\n")
+    log_stdout(f"\n# Predictors to run: {', '.join(predictor_ids)}\n")
 
     for pid in predictor_ids:
         try:
