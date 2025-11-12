@@ -23,6 +23,7 @@ DEFAULT_PARAMS = {
     "bomp_clearly_cutoff": 3.0,
     "bomp_maybe_cutoff": 1.0,
     "tmbetadisc_positive_required_signal": True,
+    "deeplocpro_group": "negative",
 }
 
 
@@ -53,9 +54,11 @@ def post_process_protein(params, protein):
     is_tat = "tat" in signalp_type.lower()
 
     tm_segments = dict_get(protein, "deeptmhmm_helices") or []
-    n_tms = len(tm_segments)
+    n_tms = 0 # len(tm_segments)
 
     loc_label = dict_get(protein, "deeplocpro_label") or "unknown"
+    loc_conf = dict_get(protein, "deeplocpro_confidence") or 0.0
+
     exposed_score = dict_get(protein, "massp_exposed_fraction") or 0.0
     exposed_prob = dict_get(protein, "massp_exposed_prob") or 0.0
     hmm_hits = dict_get(protein, "hmmer_hits") or []
@@ -91,7 +94,10 @@ def post_process_protein(params, protein):
         details.append(f"deeptmhmm({n_tms}TM)")
 
     if loc_label != "unknown":
-        details.append(f"deeplocpro({loc_label})")
+        if loc_conf:
+            details.append(f"deeplocpro({loc_label};Pr={loc_conf:.2f})")
+        else:
+            details.append(f"deeplocpro({loc_label})")
 
     if exposed_score > 0:
         details.append(f"massp(exp={exposed_score:.2f})")

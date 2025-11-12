@@ -29,24 +29,24 @@ def annotate(params, proteins):
 
 ## Testing actual DeepTMHMM (BioLib-wrapped, intended to run locally on GPU)
 
-import biolib
-from pathlib import Path
+# import biolib
+# from pathlib import Path
 
-biolib.utils.STREAM_STDOUT = True # Stream progress from app in real time
+# biolib.utils.STREAM_STDOUT = True # Stream progress from app in real time
 
-# Load app
-deeptmhmm = biolib.load('DTU/DeepTMHMM:1.0.24')
+# # Load app
+# deeptmhmm = biolib.load('DTU/DeepTMHMM:1.0.24')
 
-# Resolve path (must be absolute, and expand "~")
-test_fasta = Path("~/SerraPHIM_v2/data/bakta_annotations/AP013063.1_Serratia_marcescens_SM39_DNA_+_plasmids/AP013063.1_Serratia_marcescens_SM39_DNA_+_plasmids.faa").expanduser()
-output_path = Path("~/SerraPHIM_v2/data/inmembrane_output/deeptmhmm_test").expanduser()
+# # Resolve path (must be absolute, and expand "~")
+# test_fasta = Path("~/SerraPHIM_v2/data/bakta_annotations/AP013063.1_Serratia_marcescens_SM39_DNA_+_plasmids/AP013063.1_Serratia_marcescens_SM39_DNA_+_plasmids.faa").expanduser()
+# output_path = Path("~/SerraPHIM_v2/data/inmembrane_output/deeptmhmm_test").expanduser()
 
-# Run job with file upload
-deeptmhmm_job = deeptmhmm.cli(
-    args=f'--fasta {test_fasta}', machine='local'
-)
+# # Run job with file upload
+# deeptmhmm_job = deeptmhmm.cli(
+#     args=f'--fasta {test_fasta}', machine='local'
+# )
 
-# Save results to local directory
-deeptmhmm_job.save_files(output_path)
+# # Save results to local directory
+# deeptmhmm_job.save_files(output_path)
 
-print(f"Results saved locally to {output_path}")
+# print(f"Results saved locally to {output_path}")

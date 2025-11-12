@@ -20,6 +20,7 @@ DEFAULT_PARAMS = {
     "massp_threshold_exposed": 0.35,
     "terminal_exposed_loop_min": 50,
     "internal_exposed_loop_min": 100,
+    "deeplocpro_group": "positive",
 }
 
 GRAM_POS_SURFACE_HMMS = {
@@ -63,6 +64,8 @@ def post_process_protein(params, protein):
     n_tms = len(tm_segments)
 
     loc_label = dict_get(protein, "deeplocpro_label") or "unknown"
+    loc_conf = dict_get(protein, "deeplocpro_confidence") or 0.0
+
     exposed_score = dict_get(protein, "massp_exposed_fraction") or 0.0
     exposed_prob = dict_get(protein, "massp_exposed_prob") or 0.0
     hmm_hits = dict_get(protein, "hmmer_hits") or []
@@ -87,7 +90,10 @@ def post_process_protein(params, protein):
         details.append(f"deeptmhmm({n_tms}TM)")
 
     if loc_label != "unknown":
-        details.append(f"deeplocpro({loc_label})")
+        if loc_conf:
+            details.append(f"deeplocpro({loc_label};Pr={loc_conf:.2f})")
+        else:
+            details.append(f"deeplocpro({loc_label})")
 
     if exposed_score > 0:
         details.append(f"massp(exp={exposed_score:.2f})")

@@ -127,7 +127,7 @@ def process(params):
         try:
             predictor = get_predictor(pid)
         except Exception as e:
-            log_stderr(f"# WARNING: predictor '{pid}' not found or failed to import ({e}) — skipping.")
+            log_stderr(f"# WARNING: predictor '{pid}' not found or failed to import ({e}) — skipping.\n")
             continue
         
         try:
