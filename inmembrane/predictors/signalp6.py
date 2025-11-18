@@ -17,7 +17,7 @@ from inmembrane.helpers import log_stdout, log_stderr
 def annotate(params, proteins):
     signalp_bin = params.get("signalp_bin", "signalp6")
     fasta = params["fasta"]
-    skip_cmd = True # set True for dry-run testing
+    signalp_skip_cmd = bool(params.get("signalp_skip_cmd", False))  # for dry-run/testing
 
     out_dir = os.path.abspath(os.path.join(params.get("out_dir", "."), "signalp6_out"))
     os.makedirs(out_dir, exist_ok=True)
@@ -37,7 +37,7 @@ def annotate(params, proteins):
         "--torch_num_threads", str(params.get("signalp_threads", 8)),
     ]
 
-    if not skip_cmd:
+    if not signalp_skip_cmd:
         try:
             subprocess.run(cmd, check=True)
         except FileNotFoundError:

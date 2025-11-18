@@ -1,29 +1,71 @@
 """
-Unified predictor entrypoint — lazy importer (safe for circular imports)
+Predictor registry for SerraPHIM–inmembrane
+-------------------------------------------
+
+Every predictor module must:
+    - live in this directory
+    - be named <predictor>.py
+    - define an `annotate(params, proteins)` function
+
+This registry automatically imports all predictor modules so that:
+    from inmembrane.predictors import get_predictor
+    p = get_predictor("tmbed")
+    p.annotate(params, proteins)
 """
 
+import os
 import importlib
-import sys
+from inmembrane.helpers import log_stderr
 
-PREDICTOR_NAMES = ["signalp6", "deeptmhmm", "deeplocpro", "massp", "hmmer"]
+# Directory where this file lives
+PRED_DIR = os.path.dirname(__file__)
+
+# Registered predictor modules
+_registry = {}
+
+
+def _auto_register_predictors():
+    """
+    Auto-import <name>.py predictor modules in this directory.
+    """
+    for fname in os.listdir(PRED_DIR):
+
+        # Only python files, skip private and package files
+        if not fname.endswith(".py"):
+            continue
+        if fname.startswith("_"):
+            continue
+        if fname in ("__init__.py",):
+            continue
+
+        pred_name = fname[:-3]            # strip ".py"
+        module_name = f"inmembrane.predictors.{pred_name}"
+
+        try:
+            module = importlib.import_module(module_name)
+
+            # must define `annotate()`
+            if hasattr(module, "annotate"):
+                _registry[pred_name] = module
+            else:
+                log_stderr(f"# WARNING: predictor '{pred_name}' has no annotate() function — skipping.")
+
+        except Exception as e:
+            log_stderr(f"# WARNING: failed to import predictor '{pred_name}': {e}")
+
 
 def get_predictor(name):
     """
-    Dynamically imports a predictor module by name (lazy import).
-    Example:
-        predictor = get_predictor('signalp')
-        predictor.annotate(params, proteins)
+    Retrieve a predictor module by name.
     """
-    if name not in PREDICTOR_NAMES:
-        raise ValueError(f"Unknown predictor: {name}")
+    if not _registry:
+        _auto_register_predictors()
 
-    module_name = f"inmembrane.predictors.{name}"
-    if module_name in sys.modules:
-        return sys.modules[module_name]
+    if name not in _registry:
+        raise KeyError(f"Unknown predictor: {name}")
 
-    try:
-        return importlib.import_module(module_name)
-    except ModuleNotFoundError as e:
-        raise ImportError(f"Predictor module '{name}' not found ({e})")
-    except Exception as e:
-        raise RuntimeError(f"Error importing predictor '{name}': {e}")
+    return _registry[name]
+
+
+# Initialize registry at import time
+_auto_register_predictors()
