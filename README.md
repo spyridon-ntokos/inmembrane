@@ -75,10 +75,12 @@ $ inmembrane_scan --config /path/to/inmembrane.config my_proteome.faa
        ~/SerraPHIM_v2/data/bakta_annotations/your_sample/your_sample.faa
    ```
 
-   To switch to Gram-positive logic, edit in `inmembrane.config`:
+   To switch to Gram-positive logic, apply the following edits in `inmembrane.config`:
 
    ```python
    'protocol': 'gram_pos_modern',
+   ...
+   'deeplocpro_group': 'positive',
    ```
 
 ## Configuration
@@ -91,14 +93,14 @@ The configuration file is a simple **Python dict literal** (not JSON):
     'fasta': '',
     'csv': 'out_surfaceome.csv',
     'json': 'out_surfaceome.json',
-    'out_dir': '/home/snt/SerraPHIM_v2/data/inmembrane_output/gram_neg_test',
+    'out_dir': '~/SerraPHIM_v2/data/inmembrane_output/gram_neg_test',
 
     # Protocol: 'gram_neg_modern' or 'gram_pos_modern'
     'protocol': 'gram_neg_modern',
     'phage_receptor_veto': True,
 
     # SignalP 6.0
-    'signalp_bin': '/home/snt/.pyenv/versions/serraphim_inmembrane/bin/signalp6',
+    'signalp_bin': '~/.pyenv/versions/serraphim_inmembrane/bin/signalp6',
     'signalp_organism': 'other',
     'signalp_mode': 'fast',
     'signalp_batch': 10,
@@ -137,14 +139,13 @@ The configuration file is a simple **Python dict literal** (not JSON):
 
     # HMMER / Pfam panels
     'hmmer_bin': 'hmmscan',
-    'hmmer_db_root': '/home/snt/SerraPHIM_v2/tools/hmmer_db',
+    'hmmer_db_root': '~/SerraPHIM_v2/tools/hmmer_db',
     'hmmer_cpu': 16,
     'hmmer_evalue_cutoff': 1e-5,
     'hmmer_skip_cmd': False,
 
     'hmmer_custom_hmm_urls': [
-        "https://gitlab.pasteur.fr/gem/capsuledb/-/archive/master/"
-        "capsuledb-master.tar.gz?ref_type=heads&path=CapsuleFinder_profiles",
+        "https://gitlab.pasteur.fr/gem/capsuledb/-/archive/master/capsuledb-master.tar.gz?ref_type=heads&path=CapsuleFinder_profiles",
     ],
 
     # Gram- and Gram+ Pfam panels
@@ -172,21 +173,165 @@ Key points:
 
 ## External tools
 
-Tools used:
+The modern inmembrane pipeline uses only **local command-line tools** (no web
+services). You must install and configure these separately:
 
-- **SignalP 6.0**
-- **TMbed**
-- **DeepLocPro**
-- **HMMER 3.x**
+- **SignalP 6.0** – signal peptides, cleavage sites
+- **TMbed** – topology, transmembrane segments, beta-barrels
+- **DeepLocPro** – bacterial subcellular localization
+- **HMMER 3.x** – domain annotation against curated Pfam / custom panels
 
-Debian/Ubuntu example:
+### General recommendations
 
+- Install each tool **into its own environment** (e.g. separate `pyenv` / conda
+  env) to avoid dependency conflicts (especially different `torch` versions).
+- Put the tool binaries (e.g. `signalp6`, `tmbed`, `deeplocpro`, `hmmscan`) on
+  your `PATH` or configure absolute paths in `inmembrane.config`.
+- Always refer to the official documentation for platform-specific
+  installation details.
+
+### SignalP 6.0
+
+1. Request access and download the package from the [official DTU page](https://services.healthtech.dtu.dk/cgi-bin/sw_request?software=signalp&version=6.0&packageversion=6.0i&platform=fast).  
+2. After receiving the URL to the software package, download and unpack it in a tools directory, for example:
+
+   ```bash
+   cd ~/tools
+   wget <received_URL>/signalp-6.0i.fast.tar.gz
+   tar -xvzf signalp-6.0i.fast.tar.gz
+   cd signalp_fast/
+   ```
+
+3. Create a dedicated environment (example with `pyenv`):
+
+   ```bash
+   pyenv virtualenv 3.10.12 inmembrane_signalp
+   pyenv activate inmembrane_signalp
+   ```
+
+4. Install the Python package and dependencies, then copy models and convert
+   them for GPU use:
+
+   ```bash
+   pip install signalp-6-package/
+   pip install "numpy<2"
+
+   SIGNALP_DIR=$(python3 -c "import signalp, os; print(os.path.dirname(signalp.__file__))")
+   cp -r signalp-6-package/models/* "$SIGNALP_DIR/model_weights/"
+
+   sudo apt-get install zip  # or equivalent for your OS
+   signalp6_convert_models gpu "$SIGNALP_DIR/model_weights/"
+   ```
+
+5. Verify:
+
+   ```bash
+   signalp6 -h
+   ```
+
+Configure `signalp_bin` in `inmembrane.config` to point to the `signalp6`
+executable if it is not on your `PATH`, for example (if you installed SignalP 
+on a different venv):
 ```bash
-sudo apt-get install hmmer
-hmmscan -h
+'signalp_bin': '~/.pyenv/versions/inmembrane_signalp/bin/signalp6',
 ```
 
-TMbed / DeepLocPro / SignalP 6.0 require manual installation per tool docs.
+### DeepLocPro
+
+1. Clone and install:
+
+   ```bash
+   cd ~/tools
+   git clone https://github.com/Jaimomar99/deeplocpro
+   cd deeplocpro
+   pip install .
+   ```
+
+2. Verify with a small test FASTA:
+
+   ```bash
+   deeplocpro -d cuda \
+     -f /path/to/test_proteome.faa \
+     -o /path/to/deeplocpro_test_output
+   ```
+
+Configure `deeplocpro_bin` in `inmembrane.config` if needed.
+
+### TMbed
+
+1. Clone and install:
+
+   ```bash
+   cd ~/tools
+   git clone https://github.com/BernhoferM/TMbed.git tmbed
+   cd tmbed
+   pip install .
+   tmbed --help
+   ```
+
+2. Minimal verification (embedding + prediction on a small FASTA):
+
+   ```bash
+   tmbed embed \
+     -f /path/to/test.faa \
+     -e /path/to/tmbed_embed_test.h5
+
+   tmbed predict \
+     -f /path/to/test.faa \
+     -e /path/to/tmbed_embed_test.h5 \
+     -p /path/to/tmbed_pred_test.pred
+   ```
+
+Configure `tmbed_bin` and GPU/CPU options in `inmembrane.config`.
+
+### HMMER 3.x and custom HMMs
+
+1. Install HMMER:
+
+   ```bash
+   sudo apt-get install hmmer
+   hmmscan -h
+   ```
+
+2. Create a directory for your curated HMM panels:
+
+   ```bash
+   mkdir -p ~/tools/hmmer_db
+   cd ~/tools/hmmer_db
+   ```
+
+3. Download selected Pfam models and build a combined database (example with a
+   few OM receptor-related Pfams):
+
+   ```bash
+   PFAMS=(
+     PF00267  # Porin_1
+     PF00593  # TonB_dep_Rec
+     PF13505  # OMP_b-brl
+   )
+
+   for PF in "${PFAMS[@]}"; do
+     echo "Downloading $PF..."
+     curl -L "https://www.ebi.ac.uk/interpro/wwwapi/entry/pfam/${PF}?annotation=hmm" \
+          -o "${PF}.hmm.gz"
+     gunzip -f "${PF}.hmm.gz"
+   done
+
+   cat PF*.hmm > gramneg_receptors.hmm
+   hmmpress gramneg_receptors.hmm
+   ```
+
+4. Test the panel:
+
+   ```bash
+   hmmscan --cpu 8 \
+     ~/tools/hmmer_db/gramneg_receptors.hmm \
+     /path/to/proteome.faa
+   ```
+
+Point `hmmer_bin` and `hmmer_db_root` in `inmembrane.config` to your `hmmscan`
+binary and HMM database root, and configure panel-specific lists under
+`hmmer_pfam_gram_neg`, `hmmer_pfam_gram_pos`, and corresponding veto panels.
 
 ## Protocols and categories
 
@@ -196,20 +341,20 @@ Implemented in `inmembrane.protocols.gram_neg_modern`.
 
 Uses:
 
-- TMbed β-strands + DeepLocPro → OM barrels  
-- TMbed helices/loops  
-- SignalP 6.0  
-- DeepLocPro  
-- HMMER (receptor Pfams + veto Pfams)  
-- Optional PhReD heuristics  
+- TMbed (β-strands + α-helices/loops)
+- SignalP 6.0
+- DeepLocPro
+- HMMER (receptor + veto Pfams, custom HMM archives)  
+- Optional PhReD lists  
 
-Example categories:
+Predicted categories:
 
 - `OM(barrel)`, `OM`
 - `LIPOPROTEIN(OM)`, `LIPOPROTEIN(IM)`
 - `IM`, `IM(peri+cyto)`
-- `PERIPLASMIC`, `SECRETED`
+- `PERIPLASMIC`
 - `CYTOPLASMIC`
+- `SECRETED`
 
 `is_phage_receptor_candidate` depends on:
 
@@ -230,7 +375,7 @@ Uses:
 - HMMER Pfam panels (LPXTG, LysM, CW_binding, SLH, GW...)  
 - Optional annotation-based veto  
 
-Example categories:
+Predicted categories:
 
 - `PSE-Cellwall`
 - `PSE-Membrane`
@@ -262,14 +407,6 @@ tmbed(H=1;LoopOut=87;OutFrac=0.62);
 hmmer(PositiveHits=PF00746+PF01476);
 PRC=True,"SPy_0012 hypothetical protein"
 ```
-
-Fields:
-
-- **SeqID**
-- **Category**
-- **LoopExtent**
-- **Details**
-- **Name**
 
 ## Using the library API
 
