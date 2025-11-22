@@ -1,5 +1,32 @@
 # inmembrane changelog
 
+## v0.96.0-dev (22-Nov-2025)
+
+* Modernized codebase for Python 3.8+ only.
+* Quarantined legacy `plugins/` and `tests/` into
+  `inmembrane/quarantine_legacy_scripts` (no longer used in the main workflow).
+* Replaced legacy predictors (TMHMM, LipoP, SignalP 4, MEMSAT3, web-scrapers)
+  with a new, fully local predictor stack:
+  - SignalP 6.0 (Sec/Tat signal peptides)
+  - TMbed (α-helical TM segments, β-barrels, signal peptides, loop topology)
+  - DeepLocPro (Gram-positive / Gram-negative subcellular localization)
+  - HMMER 3 + curated Pfam and custom HMM panels (receptor & veto sets)
+* Added new Gram-specific protocols:
+  - `gram_neg_modern` – OM β-barrels, OM lipoproteins, IM/periplasmic classes,
+    and refined phage receptor candidate logic.
+  - `gram_pos_modern` – PSE-Membrane / PSE-Cellwall / PSE-Lipoprotein logic
+    for thick peptidoglycan cell envelopes, with Gram+ specific Pfam panels.
+* Introduced a unified “phage receptor candidate” flag and helper logic shared
+  between Gram− and Gram+ protocols.
+* Simplified configuration via an updated `inmembrane.config`:
+  - explicit paths for external binaries (SignalP6, TMbed, DeepLocPro, hmmscan)
+  - shared TMbed exposure thresholds for both protocols
+  - Gram-specific Pfam positive/veto panels, custom HMM URL list
+* Cleaned up packaging:
+  - trimmed legacy web-scraping and SOAP-related Python dependencies
+  - aligned `requirements.txt` with the modern codebase
+  - refreshed `setup.py`, `MANIFEST.in`, Dockerfile, and README.
+
 ## v0.95.0 (24-Jan-2018)
 * Resurrected after a period of neglect.
 * Removed deprecated CBS-DTU SOAP and TMBETA-NET plugins.

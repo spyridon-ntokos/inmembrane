@@ -1,351 +1,378 @@
-NOTE: *inmembrane* is no longer maintained, hasn't been updated for Python 3 and most of the webservices it used have gone offline or made breaking changes. Maybe one day it will be ressurected, however I'd suggest most users should not attempt to use it in it's current state.
+=============================
+inmembrane (modernized fork)
+=============================
 
-----
-==========
-inmembrane
-==========
+.. note::
 
-*inmembrane* is a pipeline for proteome annotation to predict if a
-protein is exposed on the surface of a bacteria. It orchestrates the 
-analysis of protein sequences to provides a summary of which targets may 
-be surface exposed based on predicted subcellular localization signals and 
-membrane topology. Currently protocols have been implemented for gram+ and
-gram- bacterial proteomes.
+   This repository is a **modernized fork** of the original
+   :mod:`inmembrane` project, tailored for the SerraPHIM phage–host
+   interaction pipeline.
 
-Typical usage is via the script ``inmembrane_scan``, eg::
+   The old plugin-based workflow, web-service wrappers, and unit tests
+   have been retired / quarantined. Only the **modern Gram-negative and
+   Gram-positive protocols** using local command-line tools are
+   supported.
 
-    $ inmembrane_scan mysequences.fasta
+Overview
+========
+
+*inmembrane* is a pipeline for proteome annotation that prioritizes
+bacterial proteins which are likely to be **surface-accessible** and
+act as **phage receptor candidates**.
+
+It orchestrates the analysis of protein sequences using several
+external predictors and summarizes, for each protein:
+
+* membrane topology / subcellular localization,
+* evidence for outer-membrane or cell-wall anchoring,
+* a boolean *phage-receptor-candidate* flag, and
+* supporting details from all tools.
+
+Current protocols:
+
+* ``gram_neg_modern`` – modern Gram-negative topology & OM receptor logic;
+* ``gram_pos_modern`` – modern Gram-positive cell wall / surface logic.
+
+Typical usage via the CLI script::
+
+    $ inmembrane_scan --config /path/to/inmembrane.config my_proteome.faa
 
 
-The provided sequences 
-(in `FASTA format <http://en.wikipedia.org/wiki/FASTA_format>`_) 
-are subjected to an number of sequence analyses using external
-programs (see below) and the result summarized like::
+Quick start
+===========
 
-  SPy_0008  CYTOPLASM(non-PSE)  .                         SPy_0008 from AE004092
-  SPy_0010  PSE-Membrane        tmhmm(1)                  SPy_0010 from AE004092
-  SPy_0012  PSE-Cellwall        hmm(GW2|GW3|GW1);signalp  SPy_0012 from AE004092
-  SPy_0016  MEMBRANE(non-PSE)   tmhmm(12)                 SPy_0016 from AE004092
-  SPy_0019  SECRETED            signalp                   SPy_0019 from AE004092
+1. **Clone and install** (editable mode recommended during development)::
+
+       git clone https://github.com/spyridon-ntokos/inmembrane.git
+       cd inmembrane
+       python -m pip install -e .
+
+2. **Install external command-line tools** (not Python packages):
+
+   * `SignalP 6.0`_  (``signalp6`` binary)
+   * `TMbed`_        (``tmbed`` binary)
+   * `DeepLocPro`_   (``deeplocpro`` binary)
+   * `HMMER 3.x`_    (``hmmscan``, ``hmmpress``)
+
+   Make sure they are on your ``$PATH`` or configure explicit paths in
+   ``inmembrane.config``.
+
+3. **Create or edit the configuration file**.
+
+   By default, :mod:`inmembrane` looks for::
+
+       ~/SerraPHIM_v2/tools/inmembrane/inmembrane.config
+
+   If it does not exist, a **default config** is created there the first time
+   you run :func:`inmembrane.get_params`.
+
+   You can override the config path with::
+
+       inmembrane_scan --config /path/to/inmembrane.config my_proteome.faa
+
+4. **Run a Gram-negative analysis** on a Bakta protein FASTA (example)::
+
+       inmembrane_scan \
+           --config ~/SerraPHIM_v2/tools/inmembrane/inmembrane.config \
+           ~/SerraPHIM_v2/data/bakta_annotations/your_sample/your_sample.faa
+
+   To switch to Gram-positive logic, edit in ``inmembrane.config``::
+
+       'protocol': 'gram_pos_modern',
 
 
-As well as output to stdout, this will generate a summary CSV file 
-``mysequences.csv``and a directory ``mysequences`` containing output
-files generated during the run.
-
-Although *inmembrane* is primarily designed to be used as a stand alone
-program, it can also be used as a library like::
-
-  import inmembrane
-  params = inmembrane.get_params()
-  params['fasta'] = "input.fasta"
-  annotations = inmembrane.process(params)
-
-where ``annotations`` is a dictionary of the results, with protein sequence IDs as
-keys.
-
-You can also test the functionality of the analysis plugins
-that are part of *inmembrane* by typing::
-
-    $ inmembrane_scan --test
-
-This can be useful for determining which binary dependences
-are correctly installed, or exposing any broken / offline web services
-required for a particular analysis.
-
-Running under Docker
-====================
-
-Docker containers provide a convenient way to run the software in a more
-reproducible environment.
-
-To create a Docker container and run tests::
-
-    $ docker build -t inmembrane:latest .
-    $ docker run -it inmembrane -t --skip-tests test_tmhmm,test_signalp4,test_lipop1,test_memsat3
-
-A `Dockerfile-memsat3` is also included that creates a container with MEMSAT3
-and the required Swissprot BLAST database, however you must accept the MEMSAT3
-license before using this (ie, no commercial use).
-
-To run an analysis using the container::
-
-    # Run once to get a template inmembrane.config in the current working directory
-    $ docker run -it -v $(pwd):/data inmembrane
-
-    # Edit inmembrane.config as required. Use signap_scrape_web, tmhmm_scrape_web and lipop_scrape_web
-    # as the binary versions won't exist in the default container
-    # Then, assuming my_proteome.fasta exists in the current working directory, run:
-    $ docker run -it -v $(pwd):/data inmembrane my_proteome.fasta
-
-Installation and Configuration
-==============================
-
-The latest stable release of *inmembrane* can be installed via 
-pip, or the bleeding edge from Github.
-
-Via pip::
-
-    $ sudo pip install inmembrane
-
-Or from Github::
-
-    $ git clone http://github.com/boscoh/inmembrane.git
-    $ cd inmembrane
-    $ sudo python setup.py install
-
-The package includes tests, examples, data files, docs.
-HMMER3 is the only *required* external dependency, however
-for large analyses (multiple proteomes) it is suggested 
-that local versions of other analysis programs are installed 
-rather than relying on web services (see Installing dependencies_ below).
-
-The editable parameters of *inmembrane* are found in
-``inmembrane.config``, which is always located in the same
-directory as the main script. If no such file exists, a default
-``inmembrane.config`` will be generated. By default, you probably
-don't need to change anything.
-
-The parameters are:
-
--  the path location of the binaries for SignalP, LipoP, TMHMM,
-   HMMSEARCH, and MEMSAT. This can be the full path, or just the
-   binary name if it is on the system path environment. Use ``which``
-   to check.
--  'protocol' to indicate which analysis you want to use.
-   Currently, we support:
-   
-   -  ``gram_pos`` the analysis of surface-exposed proteins of Gram+
-      bacteria;
-   -  ``gram_neg`` annotation of subcellular localization and inner
-      membrane topology classification for Gram- bacteria
-
--  'hmm\_profiles\_dir': the location of the HMMER profiles for any
-   HMM peptide sequence motifs
--  for HMMER, you can set the cutoffs for significance, the E-value
-   'hmm\_evalue\_max', and the score 'hmm\_score\_min'
--  the shortest length of a loop that sticks out of the
-   peptidoglycan layer of a Gram+ bacteria. The SurfG+ determined this
-   to be 50 amino acids for terminal loops, and twice that for
-   internal loops, 100
--  'helix\_programs' you can choose which of the
-   transmembrane-helix prediction programs you want to use
-
-Output format
+Configuration
 =============
 
-The output of *inmembrane* ``gram_pos`` protocol consists of four
-columns of output. This is printed to stdout and written as a CSV
-file, which can be opened in spreadsheet software such as EXCEL.
-The standard text output can be parsed using space delimiters
-(empty fields in the third column are indicated with a ".").
-Logging information are prefaced by a '#' character, and is sent to
-stderr.
+The configuration file is a simple **Python dict literal** (not JSON):
 
-Here's an example::
+.. code-block:: python
 
-  SPy_0008  CYTOPLASM(non-PSE)  .                         SPy_0008 from AE004092
-  SPy_0009  CYTOPLASM(non-PSE)  .                         SPy_0009 from AE004092
-  SPy_0010  PSE-Membrane        tmhmm(1)                  SPy_0010 from AE004092
-  SPy_0012  PSE-Cellwall        hmm(GW2|GW3|GW1);signalp  SPy_0012 from AE004092
-  SPy_0013  PSE-Membrane        tmhmm(1)                  SPy_0013 from AE004092
-  SPy_0015  PSE-Membrane        tmhmm(2)                  SPy_0015 from AE004092
-  SPy_0016  MEMBRANE(non-PSE)   tmhmm(12)                 SPy_0016 from AE004092
-  SPy_0019  SECRETED            signalp                   SPy_0019 from AE004092
+   {
+       # Core IO
+       'fasta': '',
+       'csv': 'out_surfaceome.csv',
+       'json': 'out_surfaceome.json',
+       'out_dir': '/home/snt/SerraPHIM_v2/data/inmembrane_output/gram_neg_test',
+
+       # Protocol: 'gram_neg_modern' or 'gram_pos_modern'
+       'protocol': 'gram_neg_modern',
+       'phage_receptor_veto': True,
+
+       # SignalP 6.0
+       'signalp_bin': '/home/snt/.pyenv/versions/serraphim_inmembrane/bin/signalp6',
+       'signalp_organism': 'other',
+       'signalp_mode': 'fast',
+       'signalp_batch': 10,
+       'signalp_write_procs': 8,
+       'signalp_threads': 8,
+       'signalp_skip_cmd': False,
+
+       # TMbed
+       'tmbed_bin': 'tmbed',
+       'tmbed_device': 'cuda',
+       'tmbed_use_gpu': True,
+       'tmbed_cpu_fallback': True,
+       'tmbed_threads': 16,
+       'tmbed_batch_size': 1500,
+       'tmbed_batch_size_long': 200,
+       'tmbed_max_gpu_len': 4000,
+       'tmbed_chunk_overlap': 500,
+       'tmbed_skip_cmd': False,
+       'tmbed_debug': False,
+       'tmbed_delete_embedding': False,
+
+       # Shared TMbed thresholds
+       'tmbed_outside_loop_min_pos': 50,
+       'tmbed_outside_loop_min_neg': 14,
+       'tmbed_outside_frac_thr': 0.30,
+       'tmbed_secreted_outside_frac': 0.80,
+
+       # DeepLocPro
+       'deeplocpro_bin': 'deeplocpro',
+       'deeplocpro_max_gpu_len': 4000,
+       'deeplocpro_truncate_len': 6000,
+       'deeplocpro_device_short': 'cuda',
+       'deeplocpro_device_long': 'cuda',
+       'deeplocpro_group': 'negative',   # 'negative' for Gram-, 'positive' for Gram+
+       'deeplocpro_skip_cmd': False,
+
+       # HMMER / Pfam panels
+       'hmmer_bin': 'hmmscan',
+       'hmmer_db_root': '/home/snt/SerraPHIM_v2/tools/hmmer_db',
+       'hmmer_cpu': 16,
+       'hmmer_evalue_cutoff': 1e-5,
+       'hmmer_skip_cmd': False,
+
+       'hmmer_custom_hmm_urls': [
+           # e.g. CapsuleFinder profiles
+           "https://gitlab.pasteur.fr/gem/capsuledb/-/archive/master/"
+           "capsuledb-master.tar.gz?ref_type=heads&path=CapsuleFinder_profiles",
+       ],
+
+       # Gram- and Gram+ Pfam panels (positive / veto)
+       'hmmer_pfam_gram_neg': [...],
+       'hmmer_pfam_veto_neg': [...],
+       'hmmer_pfam_gram_pos': [...],
+       'hmmer_pfam_veto_pos': [...],
+
+       # PhReD keyword behavior
+       'phred_appendage_pse': True,
+
+       # Order of predictors to run
+       'predictors': ['signalp6', 'tmbed', 'deeplocpro', 'hmmer'],
+
+       # Metadata / bookkeeping
+       'citations': 'citations.txt',
+   }
+
+Key points:
+
+* The **FASTA path** can be set in the config (``'fasta'``) or passed as
+  the positional argument to ``inmembrane_scan``; the CLI argument wins
+  if the config value is empty.
+* ``protocol`` selects between modern Gram-negative or Gram-positive
+  logic.
+* HMMER panels are **small curated Pfam lists** plus optional custom HMM
+  archives (e.g. CapsuleFinder).
 
 
--  the first column is the SeqID which is the first token in the
-   identifier line of the sequence in the FASTA file
+External tools
+==============
 
--  the second column is the prediction, it is CYTOPLASM(non-PSE),
-   MEMBRANE(non-PSE), PSE-Cellwall, PSE-Membrane, PSE-Lipoprotein or
-   SECRETED. Any 'PSE' (Potentially Surface Exposed) annotation means
-   that based on the predicted topology, the protein is likely to be
-   surface exposed and will be protease accessible in a
-   membrane-shaving experiment.
+The modern pipeline uses only **local command-line tools** (no web
+services):
 
--  the third line is a summary of features detected by external
-   tools:
-   
-   -  tmhmm(2) means 2 transmembrane helices were found by TMHMM
-   -  hmm(GW2\|GW3\|GW1) means that the GW1, GW2 and GW3 motifs were
-      found by HMMER hmmsearch
-   -  signalp means a secretion signal was found SignalP
-   -  lipop means a Sp II secretion signal found by LipoP with an
-      appropriate CYS residue at the cleavage site, which will be
-      attached to a phospholipid in the membrane
+* **SignalP 6.0** (Sec/Tat signal peptides, cleavage sites)
+* **TMbed** (TM alpha-helices, beta-barrels, signal peptides, topology)
+* **DeepLocPro** (bacterial subcellular localization)
+* **HMMER 3.x** (hmmscan against curated Pfam & custom panels)
 
--  the rest of the line gives the full identifier of the sequence
-   in the FASTA file.
+Example installation snippets for a Debian/Ubuntu environment
+(adapt as needed):
 
-.. _dependencies:
+* HMMER::
 
-Installing dependencies
-=======================
+    sudo apt-get install hmmer
+    hmmscan -h
 
-While *inmembrane* only requires a local installation of HMMER 3.0
-and can used web services for TMHMM, SignalP, LipoP and various
-OMP beta-barrel predictors, for large scale analyses (5000 sequences+)
-it is suggested that locally installed versions are used in the interest
-of speed, at to be polite to publicly available web services.
+* TMbed / DeepLocPro / SignalP 6.0:
 
-With each dependency, it is important that you have the exact version 
-that *inmembrane* is written to inter-operate with, otherwise *inmembrane*
-is likely to be unable to interpret the output of the downstream 
-analysis program.
+  See the respective upstream documentation. In a SerraPHIM-style setup,
+  each tool lives under ``~/SerraPHIM_v2/tools/<tool>`` and is installed
+  into a dedicated Python/conda environment to avoid conflicts (for
+  example, SignalP 6.0 on a separate ``pyenv`` than other SerraPHIM tools).
 
-Required dependencies, and their versions:
 
--  HMMER 3.0
--  TMHMM 2.0 *or* MEMSAT3
--  SignalP 4.1
--  LipoP 1.0
+Protocols and categories
+========================
 
-These instructions have been tailored for Debian-based systems, in
-particular Ubuntu 11.10+. Each of these dependencies are licensed
-free to academic users.
+Modern Gram-negative protocol
+-----------------------------
 
-HMMER 3.0
+Implemented in ``inmembrane.protocols.gram_neg_modern``.
+
+Uses:
+
+* TMbed β-strands + DeepLocPro → OM barrel detection
+* TMbed helices/loops → IM exposure, periplasmic loops
+* SignalP 6.0 → Sec/Tat signal peptides, lipoproteins
+* DeepLocPro → outer_membrane, periplasmic, cytoplasmic_membrane, etc.
+* HMMER → curated **OM receptor Pfams** and **veto Pfams**
+* Optional PhReD keyword heuristics for appendages / flagella (recommended if 
+  genomes were annotated with Bakta, so the annotations are included in the 
+  "Name" column of the output CSV).
+
+Example high-level categories:
+
+* ``OM(barrel)``, ``OM``
+* ``LIPOPROTEIN(OM)``, ``LIPOPROTEIN(IM)``
+* ``IM``, ``IM(peri+cyto)``
+* ``PERIPLASMIC``, ``SECRETED``
+* ``CYTOPLASMIC``
+
+A boolean ``is_phage_receptor_candidate`` flag is computed based on:
+
+* OM-like category / localization,
+* **structural exposure** (TMbed outside loops),
+* HMMER evidence (receptor Pfams, CapsuleFinder-like models), and
+* optional PhReD appendage heuristics.
+
+Modern Gram-positive protocol
+-----------------------------
+
+Implemented in ``inmembrane.protocols.gram_pos_modern``.
+
+Uses:
+
+* SignalP 6.0 (including lipoproteins)
+* TMbed (membrane segments, exposed loops, outside fraction)
+* DeepLocPro (cell_wall, cell_wall_&_surface, extracellular, etc.)
+* HMMER Pfam panels enriched for **LPXTG / LysM / CW_binding / SLH / GW**
+  and veto Pfams (ribosomal, core metabolism...)
+* Optional annotation-based veto to remove obvious phage structural
+  proteins and core transporters from receptor candidates.
+
+Example high-level categories:
+
+* ``PSE-Cellwall``
+* ``PSE-Membrane``
+* ``PSE-Lipoprotein``
+* ``MEMBRANE(non-PSE)``
+* ``SECRETED``
+* ``CYTOPLASMIC``
+
+Here **PSE** stands for *potentially surface-exposed* based on topology,
+while the **final receptor-candidate decision** is stored separately as
+``is_phage_receptor_candidate``.
+
+
+Output
+======
+
+For each run, :mod:`inmembrane` writes:
+
+* A **CSV summary**, one row per protein
+* A **JSON** file with the full per-protein annotation dictionary
+* A simple **citations.txt** file summarizing which predictors were used
+
+By default, the CSV header is::
+
+    SeqID,Category,LoopExtent,Details,Name
+
+Example (one line, wrapped for clarity)::
+
+    SPy_0012,PSE-Cellwall,87,
+    signalp(Sec/SPI;CS=32;Pr=0.99);
+    tmbed(H=1;LoopOut=87;OutFrac=0.62);
+    hmmer(PositiveHits=PF00746+PF01476);
+    PRC=True,"SPy_0012 hypothetical protein"
+
+Columns:
+
+* **SeqID** – sequence ID (first token from FASTA header)
+* **Category** – protocol-specific class (e.g. ``OM(barrel)`` or
+  ``PSE-Cellwall``)
+* **LoopExtent** – longest TMbed **outside loop** for that protein
+* **Details** – semicolon-delimited summary of predictor evidence, including 
+  the receptor-candidate flag (e.g. ``PRC=True``, where PRC is "Phage Receptor Candidate")
+* **Name** – full FASTA header (minus ``>``), as parsed by the pipeline
+
+
+Using the library API
+=====================
+
+Although :mod:`inmembrane` is primarily used via the CLI, it can also be
+used as a Python library::
+
+  import inmembrane
+
+  params = inmembrane.get_params("/path/to/inmembrane.config")
+  params["fasta"] = "/path/to/proteome.faa"
+
+  proteins = inmembrane.process(params)
+
+Here ``proteins`` is a dictionary keyed by sequence ID, where each
+value is a dict containing:
+
+* raw sequence / metadata (``seq``, ``name``, ``sequence_length``, ...)
+* predictor outputs (``signalp_*``, ``tmbed_*``, ``deeplocpro_*``,
+  ``hmmer_*``)
+* protocol outputs (``category``, ``loop_extent``,
+  ``is_phage_receptor_candidate``, ``details``)
+
+
+Extending the codebase
+======================
+
+Modern predictors
+-----------------
+
+*Predictors* live in ``inmembrane/predictors`` and must expose::
+
+    def annotate(params, proteins): ...
+
+where:
+
+* ``params`` is the configuration dictionary (from ``inmembrane.config``)
+* ``proteins`` is the main dict keyed by sequence ID
+
+Predictors are discovered automatically by
+``inmembrane.predictors.get_predictor`` and are listed in
+``params["predictors"]`` to control execution order (if it matters).
+
+Each predictor should:
+
+* read only the fields it needs from ``params`` and ``proteins``,
+* add new fields to the per-protein dict in place, and
+* return the (possibly modified) ``proteins`` dict.
+
+
+Protocols
 ---------
 
-On Ubuntu (and other Debian-derived) Linux distributions::
+*Protocols* live in ``inmembrane/protocols`` and implement the
+high-level Gram± logic. A protocol module must define at least:
 
-  $ sudo apt-get install hmmer
+* ``get_annotations(params)`` – return ordered predictor IDs to run
+* ``post_process_protein(params, protein)`` – inspect predictor outputs,
+  set ``category``, ``is_phage_receptor_candidate``, ``details``,
+  ``loop_extent``, etc.
+* utility functions such as ``protein_csv_line`` and ``summary_table``
+  used by :func:`inmembrane.process`.
 
-should be enough.
+Legacy content
+==============
 
-Alternatively:
+The original plugin-based scripts and test suite that relied on web
+services (TMHMM, SignalP 4.1, LipoP, MEMSAT3, mechanize, twill, etc.)
+have been removed under a **quarantine** directory and are not part of
+the modern workflow.
 
--  Download HMMER 3.0 from http://hmmer.janelia.org/software.
--  The HMMER user guide describes how to install it. For the
-   pre-compiled packages, this is as simple as putting the binaries on
-   your PATH.
+If you need to reproduce the exact legacy environment, consult the
+original upstream repository: https://github.com/boscoh/inmembrane
 
-TMHMM 2.0
----------
-
-Only one of TMHMM or MEMSAT3 are required, but users that want to
-compare transmembrane segment predictions can install both.
-
-
--  Download and install TMHMM 2.0 from
-   http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?tmhmm.
--  In the *bin/tmhmm* script, edit the *$opt_basedir* variable to point to
-   the full path of where TMHMM is installed.
-
-SignalP 4.1
------------
-
-
--  Download SignalP 4.1
-   http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?signalp. You will need
-   to fill out the form with an institutional email address and accept
-   the academic license. The software will be emailed to you.
--  Follow the installation instructions at
-   http://www.cbs.dtu.dk/services/doc/signalp-4.1.readme.
-
-LipoP 1.0
----------
-
-
--  Download LipoP 1.0 from
-   http://www.cbs.dtu.dk/cgi-bin/nph-sw_request?lipop. The
-   installation proceedure is similar to that for SignalP.
-
-MEMSAT3
--------
-
-
--  Download MEMSAT3 from
-   http://bioinfadmin.cs.ucl.ac.uk/downloads/memsat/memsat3/memsat3.0.tar.gz
--  MEMSAT3 requires NCBI BLAST ("legacy" BLAST, not BLAST+) using
-   the SwissProt (swissprot) database.
--  Legacy BLAST can be downloaded at
-   ftp://ftp.ncbi.nlm.nih.gov/blast/executables/release/LATEST/
-   installed using the instructions provided by NCBI
-   http://www.ncbi.nlm.nih.gov/staff/tao/URLAPI/unix_setup.html. We
-   have tested with version 2.2.25.
--  You will need both the 'nr' database and the 'swissprot'
-   database, since 'swissprot' is indexed against 'nr'. (The other
-   option is to download the FASTA version of Uniprot/Swiss-Prot from
-   ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
-   and create your own BLAST formatted database with using the BLAST
-   formatdb tool).
-
--  Edit the *runmemsat* script included with MEMSAT3 to point to
-   the correct locations using absolute paths:
--  'dbname' is the location of your BLAST formatted swissprot
-   database
--  'ncbidir' is the base directory of your BLAST installation
--  'execdir' is the path where the MEMSAT3 executable resides
--  'datadir' is the the path to the MEMSAT3 data directory )
-
-
-(Note the the 'runmemsat' script refers to PSIPRED v2, but it means
-MEMSAT3 - PSIPRED is NOT required).
-
-Python libraries
-----------------
-
-*inmembrane* depends on the following Python libraries (
-`Beautiful Soup <http://www.crummy.com/software/BeautifulSoup/>`_,
-`mechanize <http://wwwsearch.sourceforge.net/mechanize>`_ and
-`twill <http://twill.idyll.org/>`_, 
-`Suds <https://fedorahosted.org/suds/>`_ and 
-`Requests <http://python-requests.org>`_).
-
-``pip`` should handle installing these for you automatically.
-
-Modification guide
-==================
-
-It is a fact of life for bioinformatics that new versions of basic
-tools change output formats and APIs. We believe that it is an
-essential skill to rewrite parsers to handle the subtle but
-significant changes in different versions. We have written
-*inmembrane* to be easily modifiable and extensible. *Protocols*
-which embody a particular high level workflow are found in
-``inmembrane/protocols``.
-
-All interaction with a specific external programs or web services have
-been wrapped into a single python *plugin* module, and placed in
-the ``inmembrane/plugins`` directory. This contains the code to both run the
-program and to parse the output. We have tried to make the parsing
-code as concise as possible. Specifically, by using the native
-Python dictionary, which allows an enormous amount of flexibility,
-we can collate the results of various analyses with very little code.
-
-A more comprehensive overview can be found at http://boscoh.github.com/inmembrane/api.html.
-
-inmembrane development style guide:
------------------------------------
-
-Here are some guidelines for understanding and extending the code. 
-
--  *Confidence:* Plugins that wrap an external program should have
-   at least one high level test which is executed by run\_tests.py.
-   This allows new users to immediately determine if their
-   dependencies are operating as expected.
--  *Interface:* A plugin that wraps an external program must
-   receive a *params* data structure (derived from
-   ``inmembrane.config``) and a *proteins* data structure (which is a
-   dictionary keyed by sequence id). Plugins should return a
-   'proteins' object.
--  *Flexibility:* Plugins should have a 'force' boolean argument
-   that will force the analysis to re-run and overwrite output files.
--  *Efficiency:* All plugins should write an output file which is
-   read upon invocation to avoid the analysis being re-run.
--  *Documentation:* A plugin must have a Python docstring
-   describing what it does, what parameters it requires in the
-   ``params`` dictionary and what it adds to the ``proteins`` data
-   structure. See the code for examples.
--  *Anal:* Code should follow PEP-8 (4 space indentation) unless there is a
-   really really good reason.
--  *Anal:* Unique sequence ID strings (eg ``gi|1234567``) are
-   called 'seqid'. 'name' is ambiguous. 'prot\_id' is reasonable,
-   however conceptually a 'protein' is not the same thing as a string
-   that represents it's 'sequence' - hence the preference for 'seqid'.
--  *Anal:* All file handles should be closed when they are no
-   longer needed.
-
-
+.. _SignalP 6.0: https://services.healthtech.dtu.dk/service.php?SignalP-6.0
+.. _TMbed: https://github.com/BernhoferM/TMbed
+.. _DeepLocPro: https://github.com/Jaimomar99/deeplocpro
+.. _HMMER 3.x: http://hmmer.org/

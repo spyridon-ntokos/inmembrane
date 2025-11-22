@@ -2,16 +2,27 @@
 """
 Modernized entry point for inmembrane
 -------------------------------------
-Retains original interface but adds:
-- --config / -c   for custom config path
-- cleaner help & version output
-- unified parameter initialization
+
+Retains the original basic interface:
+
+    inmembrane_scan [options] sequences.fasta
+
+Key options:
+
+    -c / --config   Path to inmembrane.config (Python-style dict)
+
+The modern workflow runs external predictors:
+
+    - SignalP 6.0
+    - TMbed
+    - DeepLocPro
+    - HMMER (hmmscan)
+
+and then applies the Gram-negative or Gram-positive protocol to
+summarize phage receptor candidates.
 """
 
-import os
 import sys
-import glob
-import unittest
 from optparse import OptionParser
 
 import inmembrane
@@ -19,11 +30,12 @@ from inmembrane.helpers import log_stderr
 
 
 description = f"""
-inmembrane {inmembrane.__version__} (https://github.com/boscoh/inmembrane)
+inmembrane {inmembrane.__version__}
 
 Inmembrane is a proteome annotation pipeline. It takes a FASTA file,
-runs predictor modules (SignalP, DeepTMHMM, DeepLocPro, MASSP, HMMER),
-and summarizes the results by Gram-positive or Gram-negative protocol.
+runs predictor modules (SignalP 6.0, TMbed, DeepLocPro, HMMER),
+and summarizes the results using Gram-negative or Gram-positive
+modern protocols.
 
 (c) 2011–2025 Bosco Ho, Andrew Perry, and contributors
 """
@@ -34,85 +46,46 @@ def main():
     parser = OptionParser(
         usage=usage,
         version=f"%prog {inmembrane.__version__}",
-        description="Modernized inmembrane CLI entry point"
+        description="Modernized inmembrane CLI entry point",
     )
 
     # === Core options ===
     parser.add_option(
-        "-c", "--config",
-        action="store", type="string", dest="config_path",
-        help="Path to custom inmembrane.config file (default: ~/SerraPHIM_v2/tools/inmembrane/inmembrane.config)"
-    )
-
-    parser.add_option(
-        "-t", "--test",
-        action="store_true", dest="run_tests", default=False,
-        help="Run internal predictor unit tests instead of a full analysis."
-    )
-
-    parser.add_option(
-        "-n", "--tests-no-network",
-        action="store_true", dest="no_network", default=False,
-        help="Skip tests that require a network connection."
-    )
-
-    parser.add_option(
-        "--skip-tests",
-        action="store", type="string", dest="skip_tests",
-        help="Comma-separated list of tests to skip (e.g. test_signalp_web,test_tmhmm_web)."
+        "-c",
+        "--config",
+        action="store",
+        type="string",
+        dest="config_path",
+        help=(
+            "Path to custom inmembrane.config file "
+            "(default: ~/SerraPHIM_v2/tools/inmembrane/inmembrane.config)"
+        ),
     )
 
     (options, args) = parser.parse_args()
 
-    log_stderr(f"inmembrane {inmembrane.__version__} (https://github.com/boscoh/inmembrane)")
-
-    # === Run normal analysis ===
-    if not options.run_tests:
-        params = inmembrane.get_params(options.config_path)
-
-        # Determine FASTA path
-        if (not params.get("fasta")) and not args:
-            print(description)
-            parser.print_help()
-            sys.exit(1)
-        if not params.get("fasta") and args:
-            params["fasta"] = args[0]
-
-        log_stderr(f"# Using config: {params['_config_path']}")
-        log_stderr(f"# Using FASTA: {params['fasta']}")
-        inmembrane.process(params)
-
-    # === Run unit tests instead ===
-    else:
-        run_tests(options)
-
-
-def run_tests(options):
-    """Execute available plugin/predictor tests."""
-    log_stderr("Running tests")
-
-    skip_list = []
-    if options.skip_tests:
-        skip_list = [t.strip() for t in options.skip_tests.split(",")]
-        log_stderr("Will skip: " + ", ".join(skip_list))
-
-    file_tag = os.path.join(inmembrane.module_dir, "tests", "test*.py")
-    test_names = [os.path.basename(f)[:-3] for f in glob.glob(file_tag)]
-
-    tests_to_run = []
-    for test_name in test_names:
-        if not (options.no_network and test_name.endswith("_web")):
-            if test_name not in skip_list:
-                exec(f"from inmembrane.tests.{test_name} import *")
-                tests_to_run.append(test_name)
-
-    log_stderr("Will run: " + ", ".join(tests_to_run))
     log_stderr(
-        "\n# Note: some tests may fail if a web service is unavailable "
-        "or an external binary is not installed.\n"
+        f"inmembrane {inmembrane.__version__} "
+        "(https://github.com/spyridon-ntokos/inmembrane)"
     )
 
-    unittest.main(argv=[os.path.basename(sys.argv[0])])
+    # Load parameters (creates a default config if missing)
+    params = inmembrane.get_params(options.config_path)
+
+    # Determine FASTA path: CLI arg overrides empty config 'fasta'
+    if (not params.get("fasta")) and not args:
+        # No FASTA in config and no positional argument → show help & exit
+        print(description)
+        parser.print_help()
+        sys.exit(1)
+
+    if not params.get("fasta") and args:
+        params["fasta"] = args[0]
+
+    log_stderr(f"# Using config: {params['_config_path']}")
+    log_stderr(f"# Using FASTA: {params['fasta']}")
+
+    inmembrane.process(params)
 
 
 if __name__ == "__main__":

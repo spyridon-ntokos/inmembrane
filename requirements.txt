@@ -1,8 +1,10 @@
-BeautifulSoup>=4.11.1
-bs4
-cssselect
-lxml
-requests>=2.0.0
-suds>=0.4
-semantic_version
-twill==3.1.0
+# Python dependencies for the modern inmembrane fork.
+#
+# The core pipeline uses only the Python standard library.
+# External tools (SignalP 6.0, TMbed, DeepLocPro, HMMER) are installed
+# separately and configured via inmembrane.config.
+#
+# Optional extras:
+#   beautifulsoup4   # required only if you use helpers.html2text()
+
+#beautifulsoup4>=4.11.1

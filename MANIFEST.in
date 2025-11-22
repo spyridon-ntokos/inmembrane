@@ -1,5 +1,15 @@
-include examples/surfg/AE004092.*
-recursive-include docs *
-exclude docs/inmembrane.doc
 include README.rst
-include inmembrane_example.py
+include CHANGELOG.md
+include requirements.txt
+include inmembrane.config
+
+# Example data / configs (if present)
+recursive-include examples *
+
+# Core package data
+recursive-include inmembrane/protocols *
+recursive-include inmembrane/predictors *
+
+# Don’t ship legacy docs or quarantined legacy code in sdists
+prune docs
+prune inmembrane/quarantine_legacy_scripts

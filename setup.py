@@ -1,14 +1,15 @@
 from setuptools import setup, find_packages
 
 PACKAGE = "inmembrane"
+VERSION = "0.96.0-dev"  # keep in sync with inmembrane.__version__
+
 DESCRIPTION = (
-    "A modular bioinformatics pipeline for proteome annotation and "
-    "prediction of bacterial surface-exposed proteins."
+    "A modernized bioinformatics pipeline for proteome annotation and "
+    "prioritization of bacterial surface / phage-receptor candidate proteins."
 )
 AUTHOR = "Andrew Perry, Bosco Ho, and contributors"
 AUTHOR_EMAIL = "ajperry@pansapiens.com"
-URL = "https://github.com/spyridon-ntokos/inmembrane-modern"
-VERSION = "0.96.0"
+URL = "https://github.com/spyridon-ntokos/inmembrane"
 
 setup(
     name=PACKAGE,
@@ -30,16 +31,12 @@ setup(
         ]
     },
     scripts=["inmembrane_scan"],
+    # The modern workflow relies on external CLI tools (SignalP 6.0, TMbed,
+    # DeepLocPro, HMMER), which must be installed separately and configured
+    # via inmembrane.config. We keep Python runtime dependencies minimal.
     install_requires=[
-        "beautifulsoup4>=4.11.1",
-        "bs4",
-        "cssselect",
-        "lxml",
-        "requests>=2.0.0",
-        "semantic_version",
-        "suds>=0.4",
-        "twill>=3.1.0",
-        "pyyaml",
+        # no mandatory non-stdlib dependencies for the core pipeline
+        # (PyYAML, bs4, etc., can be installed separately if needed)
     ],
     license="BSD-3-Clause",
     classifiers=[
@@ -49,6 +46,7 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
     python_requires=">=3.8",

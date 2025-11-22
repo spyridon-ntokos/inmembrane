@@ -1,68 +1,125 @@
-# New release packaging checklist:
+# Release / packaging checklist (modern inmembrane)
 
-* Always use a clean checkout, otherwise setup.py may pick up files not
-  tracked by git that you don't actually want to distribute.
+This checklist is for **local / project releases** of the
+`inmembrane` fork (SerraPHIM integration), not for the legacy
+PyPI / DockerHub distribution.
 
-* Make sure CHANGELOG is updated with major changes since the last 
-  release (look through the commit history)
+---
 
-* Update version in inmembrane/__init__.py.
+## 1. Prepare a clean tree
 
-* git commit -a
+- Use a fresh checkout or ensure your working tree is clean:
 
-* Create a new tag for the release:
-  git tag inmembrane-0.xx
-  git push --tags
-  git push
+  ```bash
+  git status
+  ```
 
-* Run:
-  * virtualenv /tmp/inmembrane_venv
-  * source /tmp/inmembrane_venv/bin/activate
-  * python setup.py sdist
-  * pip uninstall inmembrane
-    pip install dist/inmembrane-<version>.tar.gz
-  * Test the installed version: 
-    inmembrane_scan --test
+- Make sure `CHANGELOG` (if present) is updated with major changes
+  since the last tag (scan the commit history if needed).
 
-As per https://packaging.python.org/tutorials/distributing-packages/#upload-your-distributions
+- Update the version string in:
 
-* Create a `~/.pypirc` file like:
+  * `inmembrane/__init__.py`
+  * `setup.py`
 
-```
-[pypi]
-username=<my_username>
-password=<my_password>
-~                           
-```
+  They should both match (e.g. `0.96.0-dev`).
 
-* chmod 600 ~/.pypirc
+- Commit:
 
-* Push a new version to PyPi:
-  * pip install twine
-  * twine upload dist/*
+  ```bash
+  git commit -a -m "Bump version to X.Y.Z and update changelog"
+  ```
 
-* Switch to the the gh-pages branch:
-  git checkout gh-pages
+---
 
-* Update the pypi download link in index.html.wrap. 
-  Regenerate HTML docs with:
-  python wrap.py *html.wrap
-  
-* Commit and push the changes.
-  git commit -a; git push
+## 2. Tag the release
 
-# Dockerhub release
+Create a tag and push it:
 
 ```bash
-# Always use a fresh clone
-git clone https://github.com/boscoh/inmembrane
-cd inmembrane
-export DOCKERHUB_USERNAME=pansapiens
-export VERSION=$(./inmembrane_scan --version | cut -d " " -f 2)
-docker build -t inmembrane:latest -t inmembrane:$VERSION .
-docker run -it inmembrane:$VERSION -t --skip-tests test_tmhmm,test_signalp4,test_lipop1,test_memsat3
-docker tag inmembrane:$VERSION $DOCKERHUB_USERNAME/inmembrane:$VERSION
-docker tag inmembrane:latest $DOCKERHUB_USERNAME/inmembrane:latest
-docker login --username=$DOCKERHUB_USERNAME --email=youremail@company.com
-docker push $DOCKERHUB_USERNAME/inmembrane
+git tag inmembrane-X.Y.Z
+git push
+git push --tags
 ```
+
+Use whatever tag naming scheme you prefer (`inmembrane-0.96.0-dev`,
+`v0.96.0`, etc.), but keep it consistent.
+
+---
+
+## 3. Build and test from a clean virtualenv
+
+Create a throwaway virtual environment and install from source:
+
+```bash
+python -m venv /tmp/inmembrane_venv
+source /tmp/inmembrane_venv/bin/activate
+
+# From the repo root:
+pip install --upgrade pip
+pip install .
+```
+
+Smoke test the CLI:
+
+```bash
+inmembrane_scan --help
+inmembrane_scan --version
+```
+
+Run a **small Gram-negative test** (adjust paths as appropriate):
+
+```bash
+inmembrane_scan \
+  --config ~/SerraPHIM_v2/tools/inmembrane/inmembrane.config \
+  ~/SerraPHIM_v2/data/bakta_annotations/gram_neg_sample/proteome.faa
+```
+
+Then a **small Gram-positive test**:
+
+```bash
+inmembrane_scan \
+  --config ~/SerraPHIM_v2/tools/inmembrane/inmembrane.config \
+  ~/SerraPHIM_v2/data/bakta_annotations/gram_pos_sample/proteome.faa
+```
+
+Verify that:
+
+- CSV and JSON files are created under the expected `out_dir`
+- The `Category`, `LoopExtent`, and `Details` columns look reasonable
+- `PhageReceptorCandidate=True/False` annotations appear where expected
+
+If something fails here, fix it **before** pushing tags.
+
+---
+
+## 4. Optional: build source/wheel artifacts
+
+If you want sdist/wheel artifacts (for internal distribution):
+
+```bash
+pip install build
+python -m build
+```
+
+This creates:
+
+- `dist/inmembrane-X.Y.Z.tar.gz`
+- `dist/inmembrane-X.Y.Z-py3-none-any.whl`
+
+You can share these internally or upload them to a private index if
+needed.
+
+---
+
+## 5. Optional: publishing
+
+At the moment this fork is intended primarily for **SerraPHIM internal
+use**. If you later decide to push to PyPI or another public index:
+
+- Create `~/.pypirc` and configure credentials
+- Use `twine` to upload the files under `dist/`
+
+This is **not** part of the standard workflow and should only be done
+once the modern codebase is stable, documented, and decoupled from any
+project-specific paths.
